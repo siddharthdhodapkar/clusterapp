@@ -1,51 +1,85 @@
-# Copyright (c) Streamlit Inc. (2018-2022) Snowflake Inc. (2022)
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# -*- coding: utf-8 -*-
+"""
+Created on Sun Oct  8 00:16:54 2023
 
+@author: lenovo
+"""
+
+# -*- coding: utf-8 -*-
+"""
+Created on Sat Oct  7 15:04:32 2023
+
+@author: lenovo
+"""
+
+import base64
 import streamlit as st
-from streamlit.logger import get_logger
+import pandas as pd
+from sklearn.cluster import DBSCAN
 
-LOGGER = get_logger(__name__)
+#Title
+st.title("Distance Based Clustering App")
 
-
-def run():
-    st.set_page_config(
-        page_title="Hello",
-        page_icon="👋",
-    )
-
-    st.write("# Welcome to Streamlit! 👋")
-
-    st.sidebar.success("Select a demo above.")
-
-    st.markdown(
-        """
-        Streamlit is an open-source app framework built specifically for
-        Machine Learning and Data Science projects.
-        **👈 Select a demo from the sidebar** to see some examples
-        of what Streamlit can do!
-        ### Want to learn more?
-        - Check out [streamlit.io](https://streamlit.io)
-        - Jump into our [documentation](https://docs.streamlit.io)
-        - Ask a question in our [community
-          forums](https://discuss.streamlit.io)
-        ### See more complex demos
-        - Use a neural net to [analyze the Udacity Self-driving Car Image
-          Dataset](https://github.com/streamlit/demo-self-driving)
-        - Explore a [New York City rideshare dataset](https://github.com/streamlit/demo-uber-nyc-pickups)
+# User Guide
+st.write(
     """
+    ## User Guide
+
+    This app clusters latitude and longitude points from an Excel sheet based on user-defined distance, 
+    assigns cluster labels, and provides the output as a downloadable Excel sheet.
+
+    ### Instructions:
+    
+    1. Upload an Excel sheet with the following details:
+       - Column A: Issue Number
+       - Column B: Latitude
+       - Column C: Longitude
+    2. Use the slider to select a distance for clustering.
+    3. The app will display the clusters in a table and provide a download link for the clustered data.
+    4. Click on the Column Labels in the table to sort the entries.
+    5. All the Issue Numbers having the same Cluster Label are within the selected distance.
+    6. Cluster Labels having only one Issue Number are individual complaints not within the proximity of the selected distance.
+    """
+)
+
+# File upload
+uploaded_file = st.file_uploader("Choose an Excel file", type=["xlsx"])
+
+if uploaded_file is not None:
+    # Read data from Excel
+    data = pd.read_excel(uploaded_file)
+
+    # Distance filter
+    min_distance = 35
+    max_distance = 100
+    step = 5
+
+    selected_distance = st.slider("Select Distance (in meters)", min_distance, max_distance, step)
+
+    # Clustering
+    coords = data[['Latitude', 'Longitude']].values
+    kms_per_radian = 6371.0
+    epsilon = selected_distance / 1000 / kms_per_radian  # Convert to radians
+
+    db = DBSCAN(eps=epsilon, min_samples=1, algorithm='ball_tree', metric='haversine').fit(
+        (coords * (3.14159265358979323846 / 180)).tolist()
     )
+    cluster_labels = db.labels_
 
+    # Filter unique clusters
+    unique_clusters = set(cluster_labels)
 
-if __name__ == "__main__":
-    run()
+    # Assign cluster label -1 to noise complaints
+    noise_points = data[cluster_labels == -1]
+    data['Cluster Label'] = cluster_labels
+
+    # Display clusters in a table
+    st.subheader("Clusters Table")
+    st.write(data)
+
+    # Provide download link for Excel sheet
+    st.subheader("Download Clusters as Excel")
+    csv = data.to_csv(index=False)
+    b64 = base64.b64encode(csv.encode()).decode()  # B64 encoding for download link
+    href = f'<a href="data:file/csv;base64,{b64}" download="clustered_complaints.csv">Download CSV File</a>'
+    st.markdown(href, unsafe_allow_html=True)
