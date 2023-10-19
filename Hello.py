@@ -1,11 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Sun Oct  8 00:16:54 2023
-
-@author: lenovo
-"""
-
-# -*- coding: utf-8 -*-
 """
 Created on Sat Oct  7 15:04:32 2023
 
